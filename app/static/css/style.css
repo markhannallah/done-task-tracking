@@ -91,7 +91,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    min-width: 0; /* Prevent flex item from overflowing */
+    min-width: 0;
 }
 
 .task-title {
@@ -101,6 +101,32 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.task-points,
+.completion-date {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.completion-date:hover {
+    cursor: help;
+}
+
+@media (max-width: 768px) {
+    .task-info {
+        flex-wrap: wrap;
+    }
+    
+    .task-title {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
 }
 
 /* Task Points Badge */
@@ -1042,4 +1068,117 @@ body {
 #regular-tasks .task-points {
     color: var(--regular-color);
     background: rgba(181, 229, 207, 0.15);
+}
+
+/* Completed Section Header */
+.completed-header {
+    background: var(--text-secondary);
+    color: white;
+}
+
+.completed-header .task-count {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+#completed-tasks {
+    max-height: 400px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+#completed-tasks::-webkit-scrollbar {
+    width: 6px;
+}
+
+#completed-tasks::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+#completed-tasks::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+#completed-tasks::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+#completed-tasks .list-group-item {
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+#completed-tasks .list-group-item:hover {
+    opacity: 1;
+}
+
+/* Task Metadata */
+.task-metadata {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.completion-date {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.completion-date:hover {
+    cursor: help;
+}
+
+#completed-tasks .task-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+#completed-tasks .task-metadata {
+    margin-left: 0.25rem;
+}
+
+/* Navbar Styling */
+.navbar {
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    padding: 1rem 0;
+    margin-bottom: 2rem;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.brand-icon {
+    font-size: 1.75rem;
+    color: var(--mit-color);
+}
+
+.welcome-section {
+    text-align: right;
+}
+
+.current-date {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.welcome-message {
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 500;
 }

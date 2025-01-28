@@ -10,9 +10,24 @@
     <title>{% block title %}{% endblock %}</title>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg">
         <div class="container">
-            <a class="navbar-brand" href="/">Done - Task Tracking</a>
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-check2-circle brand-icon"></i>
+                Done Tasks
+            </a>
+            <div class="navbar-nav me-auto">
+                <a class="nav-link" href="/archived-tasks">
+                    <i class="bi bi-archive"></i>
+                    Archive
+                </a>
+            </div>
+            <div class="navbar-text ms-auto">
+                <div class="welcome-section">
+                    <div class="current-date">{{ current_date }}</div>
+                    <div class="welcome-message">Welcome back! You've earned {{ total_xp }} XP so far</div>
+                </div>
+            </div>
         </div>
     </nav>
 

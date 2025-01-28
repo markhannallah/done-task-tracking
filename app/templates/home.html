@@ -6,15 +6,14 @@
     <div class="row">
         <!-- Main Content Area -->
         <div class="col-md-8">
-            {% include 'welcome.html' %}
             
             <!-- MIT Tasks Section -->
             <div class="card mb-4">
                 <div class="card-body">
                     <div class="section-header mit-header">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="section-title">Most Important Tasks</h5>
-                            <span class="task-count">{{ open_mit_tasks }} open</span>
+                            <h2 class="section-title">Most Important Tasks</h2>
+                            <span class="task-count" id="mit-count">{{ open_mit_tasks }} active</span>
                         </div>
                     </div>
 
@@ -32,8 +31,10 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Active MIT Tasks -->
                     <div class="list-group" id="mit-tasks">
                         {% for task in mit_tasks %}
+                        {% if not task.completed %}
                         <div class="list-group-item {% if task.completed %}completed-task{% endif %}" data-task-id="{{ task.id }}">
                             <div class="task-content">
                                 <div class="drag-handle">
@@ -55,8 +56,41 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                         {% endfor %}
                     </div>
+
+                    <!-- Completed MIT Tasks -->
+                    {% if completed_mit_tasks %}
+                    <div class="completed-section mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-muted">Completed</h6>
+                            <span class="task-count text-muted" id="completed-mit-count">{{ completed_mit_tasks|length }} completed</span>
+                        </div>
+                        <div class="list-group" id="completed-mit-tasks">
+                            {% for task in completed_mit_tasks %}
+                            <div class="list-group-item completed-task" data-task-id="{{ task.id }}">
+                                <div class="task-content">
+                                    <div class="task-info">
+                                        <span class="task-title">{{ task.title }}</span>
+                                        <span class="task-metadata">
+                                            <span class="task-points">{{ task.points }} XP</span>
+                                            <span class="completion-date" title="{{ task.completed_at }}">
+                                                {{ task.completed_at.strftime('%I:%M %p') }}
+                                            </span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="text-center mt-2">
+                            <button class="btn btn-sm btn-outline-secondary archive-tasks" data-task-type="mit">
+                                Archive Completed Tasks
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -65,8 +99,8 @@
                 <div class="card-body">
                     <div class="section-header regular-header">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="section-title">Regular Tasks</h5>
-                            <span class="task-count">{{ open_regular_tasks }} open</span>
+                            <h2 class="section-title">Regular Tasks</h2>
+                            <span class="task-count" id="regular-count">{{ open_regular_tasks }} active</span>
                         </div>
                     </div>
 
@@ -92,8 +126,10 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Active Regular Tasks -->
                     <div class="list-group" id="regular-tasks">
                         {% for task in regular_tasks %}
+                        {% if not task.completed %}
                         <div class="list-group-item {% if task.completed %}completed-task{% endif %}" data-task-id="{{ task.id }}">
                             <div class="task-content">
                                 <div class="drag-handle">
@@ -115,8 +151,41 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                         {% endfor %}
                     </div>
+
+                    <!-- Completed Regular Tasks -->
+                    {% if completed_regular_tasks %}
+                    <div class="completed-section mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-muted">Completed</h6>
+                            <span class="task-count text-muted" id="completed-regular-count">{{ completed_regular_tasks|length }} completed</span>
+                        </div>
+                        <div class="list-group" id="completed-regular-tasks">
+                            {% for task in completed_regular_tasks %}
+                            <div class="list-group-item completed-task" data-task-id="{{ task.id }}">
+                                <div class="task-content">
+                                    <div class="task-info">
+                                        <span class="task-title">{{ task.title }}</span>
+                                        <span class="task-metadata">
+                                            <span class="task-points">{{ task.points }} XP</span>
+                                            <span class="completion-date" title="{{ task.completed_at }}">
+                                                {{ task.completed_at.strftime('%I:%M %p') }}
+                                            </span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="text-center mt-2">
+                            <button class="btn btn-sm btn-outline-secondary archive-tasks" data-task-type="regular">
+                                Archive Completed Tasks
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -149,6 +218,7 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script>
 // Global chart variables
 let weeklyChart, cumulativeChart;

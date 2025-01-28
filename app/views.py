@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, current_app
 from .models import Task, DailyXP
 from . import db
 from datetime import datetime, timedelta
 import calendar
+from sqlalchemy import func, text
 
 views = Blueprint('views', __name__)
 
@@ -36,33 +37,47 @@ def format_relative_time(days_ago):
         years = days_ago // 365
         return f"{years} year{'s' if years != 1 else ''} ago"
 
+def init_db():
+    """Initialize database with new columns"""
+    with current_app.app_context():
+        try:
+            # Add archived column if it doesn't exist
+            db.session.execute(text('ALTER TABLE task ADD COLUMN archived BOOLEAN DEFAULT 0'))
+            db.session.execute(text('ALTER TABLE task ADD COLUMN archived_at DATETIME'))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Columns might already exist: {e}")
+
 @views.route('/')
 def home():
-    # Get current date information
-    today = datetime.now()
-    date_info = {
-        'day': today.strftime('%A'),
-        'date': today.strftime('%B %d, %Y')
-    }
+    # Get current date in readable format
+    current_date = datetime.now().strftime('%A, %B %d')
     
-    # Get tasks sorted by completion status (open first) then by order
-    mit_tasks = Task.query.filter_by(task_type='mit').order_by(Task.completed, Task.order, Task.id).all()
-    regular_tasks = Task.query.filter_by(task_type='regular').order_by(Task.completed, Task.order, Task.id).all()
+    try:
+        # Get MIT tasks (both active and completed but not archived)
+        mit_tasks = Task.query.filter_by(task_type='mit', archived=False).order_by(Task.order).all()
+        completed_mit_tasks = [t for t in mit_tasks if t.completed]
+        mit_tasks = [t for t in mit_tasks if not t.completed]
+        
+        # Get regular tasks (both active and completed but not archived)
+        regular_tasks = Task.query.filter_by(task_type='regular', archived=False).order_by(Task.order).all()
+        completed_regular_tasks = [t for t in regular_tasks if t.completed]
+        regular_tasks = [t for t in regular_tasks if not t.completed]
+        
+    except Exception as e:
+        print(f"Error getting tasks: {e}")
+        mit_tasks = []
+        regular_tasks = []
+        completed_mit_tasks = []
+        completed_regular_tasks = []
     
     # Count open tasks
-    open_regular_tasks = sum(1 for task in regular_tasks if not task.completed)
-    open_mit_tasks = sum(1 for task in mit_tasks if not task.completed)
-    total_open = open_regular_tasks + open_mit_tasks
+    open_mit_tasks = len(mit_tasks)
+    open_regular_tasks = len(regular_tasks)
     
-    # Calculate task distribution percentages
-    mit_percentage = round((open_mit_tasks / total_open * 100) if total_open > 0 else 0)
-    regular_percentage = round((open_regular_tasks / total_open * 100) if total_open > 0 else 0)
-    
-    # Calculate completion rate
-    total_tasks = total_open + sum(1 for task in regular_tasks + mit_tasks if task.completed)
-    completion_rate = round((1 - total_open / total_tasks * 100) if total_tasks > 0 else 0)
-    
-    total_xp = sum(task.points for task in Task.query.filter_by(completed=True).all())
+    # Calculate total XP
+    total_xp = db.session.query(func.sum(DailyXP.xp_earned)).scalar() or 0
     
     # Get the current week's data (Sunday to Saturday)
     today = datetime.utcnow().date()
@@ -147,11 +162,24 @@ def home():
     daily_average = week_total / 7 if len(weekly_xp) > 0 else 0  # Only calculate average if we have data
     week_tasks_completed = sum(tasks_by_date.values())
     
+    # Calculate task distribution percentages
+    mit_percentage = round((open_mit_tasks / (open_mit_tasks + open_regular_tasks) * 100) if (open_mit_tasks + open_regular_tasks) > 0 else 0)
+    regular_percentage = round((open_regular_tasks / (open_mit_tasks + open_regular_tasks) * 100) if (open_mit_tasks + open_regular_tasks) > 0 else 0)
+    
+    # Calculate completion rate
+    total_tasks = open_mit_tasks + open_regular_tasks + len(completed_mit_tasks) + len(completed_regular_tasks)
+    completion_rate = round((1 - (open_mit_tasks + open_regular_tasks) / total_tasks * 100) if total_tasks > 0 else 0)
+    
     return render_template(
         "home.html",
+        current_date=current_date,
+        total_xp=total_xp,
         regular_tasks=regular_tasks,
         mit_tasks=mit_tasks,
-        total_xp=total_xp,
+        completed_mit_tasks=completed_mit_tasks,
+        completed_regular_tasks=completed_regular_tasks,
+        open_mit_tasks=open_mit_tasks,
+        open_regular_tasks=open_regular_tasks,
         weekly_xp_data=weekly_xp_data,
         cumulative_xp_data=cumulative_xp_data,
         task_sizes=TASK_SIZES,
@@ -159,14 +187,11 @@ def home():
         week_total=week_total,
         daily_average=daily_average,
         suggested_max=suggested_max,
-        open_regular_tasks=open_regular_tasks,
-        open_mit_tasks=open_mit_tasks,
         week_tasks_completed=week_tasks_completed,
         total_tasks_completed=total_tasks_completed,
         mit_percentage=mit_percentage,
         regular_percentage=regular_percentage,
-        completion_rate=completion_rate,
-        date_info=date_info
+        completion_rate=completion_rate
     )
 
 @views.route('/add-task', methods=['POST'])
@@ -203,24 +228,52 @@ def add_task():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
 
-@views.route('/complete_task/<int:task_id>', methods=['POST'])
-def complete_task(task_id):
-    task = Task.query.get(task_id)
-    if task:
-        if not task.completed:
-            task.completed = True
-            task.completed_at = datetime.utcnow()
-            # Add XP to daily tracking
+@views.route('/complete-task', methods=['POST'])
+def complete_task():
+    if not request.is_json:
+        return jsonify({"success": False, "error": "Content-Type must be application/json"}), 400
+
+    try:
+        data = request.get_json()
+        task_id = data.get('taskId')
+        if not task_id:
+            return jsonify({"success": False, "error": "No task ID provided"}), 400
+
+        # Convert task_id to integer if it's a string
+        try:
+            task_id = int(task_id)
+        except ValueError:
+            return jsonify({"success": False, "error": "Invalid task ID format"}), 400
+
+        task = Task.query.get(task_id)
+        if not task:
+            return jsonify({"success": False, "error": "Task not found"}), 404
+
+        if task.completed:
+            return jsonify({"success": False, "error": "Task already completed"}), 400
+
+        task.completed = True
+        task.completed_at = datetime.utcnow()
+        
+        # Add XP to daily tracking
+        try:
             DailyXP.add_xp(task.points)
             db.session.commit()
-            
-            return jsonify({
-                "success": True,
-                "message": "Task completed!",
-                "points": task.points
-            }), 200
-        return jsonify({"success": False, "message": "Task was already completed"}), 200
-    return jsonify({"success": False, "error": "Task not found"}), 404
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "error": f"Database error: {str(e)}"}), 500
+
+        return jsonify({
+            "success": True,
+            "message": "Task completed successfully",
+            "points": task.points,
+            "redirect": "/archived-tasks"
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error completing task: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @views.route('/delete_task/<int:task_id>', methods=['POST'])
 def delete_task(task_id):
@@ -258,3 +311,59 @@ def reorder_tasks():
         return jsonify({"success": True}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
+
+@views.route('/archive-tasks', methods=['POST'])
+def archive_tasks():
+    if not request.is_json:
+        return jsonify({"success": False, "error": "Content-Type must be application/json"}), 400
+    
+    try:
+        data = request.get_json()
+        task_type = data.get('taskType')  # 'mit' or 'regular'
+        
+        # Query for completed, unarchived tasks of the specified type
+        tasks = Task.query.filter_by(
+            task_type=task_type,
+            completed=True,
+            archived=False
+        ).all()
+        
+        if not tasks:
+            return jsonify({"success": False, "error": "No completed tasks to archive"}), 400
+        
+        # Archive the tasks
+        now = datetime.utcnow()
+        for task in tasks:
+            task.archived = True
+            task.archived_at = now
+        
+        db.session.commit()
+        return jsonify({"success": True, "message": f"Archived {len(tasks)} tasks"})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error archiving tasks: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@views.route('/archived-tasks')
+def archived_tasks():
+    try:
+        # Get completed but unarchived tasks
+        completed_tasks = Task.query.filter_by(completed=True, archived=False).order_by(Task.completed_at.desc()).all()
+        
+        # Get archived tasks sorted by archived date
+        archived_tasks = Task.query.filter_by(archived=True).order_by(Task.archived_at.desc()).all()
+    except Exception as e:
+        print(f"Error getting tasks: {e}")
+        completed_tasks = []
+        archived_tasks = []
+    
+    # Get current date for base template
+    current_date = datetime.now().strftime('%A, %B %d')
+    total_xp = db.session.query(func.sum(DailyXP.xp_earned)).scalar() or 0
+    
+    return render_template('archive.html',
+                         current_date=current_date,
+                         total_xp=total_xp,
+                         completed_tasks=completed_tasks,
+                         archived_tasks=archived_tasks)

@@ -3,11 +3,13 @@ from datetime import datetime
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    points = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(150), nullable=False)
     completed = db.Column(db.Boolean, default=False)
     completed_at = db.Column(db.DateTime)
-    task_type = db.Column(db.String(10), nullable=False)  # 'mit' or 'regular'
+    archived = db.Column(db.Boolean, default=False)
+    archived_at = db.Column(db.DateTime)
+    points = db.Column(db.Integer, default=0)
+    task_type = db.Column(db.String(10), default='regular')  # 'mit' or 'regular'
     order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
